@@ -47,7 +47,7 @@
 <text x="930" y="260" font-family="monospace" font-size="13.5" font-weight="400" fill="#334155">gap 0.050</text>
 <text x="930" y="281" font-family="monospace" font-size="13.5" font-weight="400" fill="#334155">tangent 25.4°</text>
 <text x="930" y="302" font-family="monospace" font-size="13.5" font-weight="400" fill="#334155">frame 6.2°</text>
-<text x="930" y="323" font-family="monospace" font-size="13.5" font-weight="400" fill="#334155">register 0.122</text>
+<text x="930" y="323" font-family="monospace" font-size="13.5" font-weight="400" fill="#334155">register 0.119</text>
 <text x="930" y="344" font-family="monospace" font-size="13.5" font-weight="700" fill="#15803d">READABLE</text>
 <text x="930" y="375" font-family="sans-serif" font-size="17" font-weight="700" fill="#0f172a">Distortion</text>
 <text x="930" y="398" font-family="monospace" font-size="12.5" fill="#334155">area 0.998–1.012</text>

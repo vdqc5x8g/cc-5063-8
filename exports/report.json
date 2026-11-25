@@ -13,8 +13,8 @@
   },
   "rotationCheck": {
     "yawRadChecked": 0.61,
-    "maxUvDifference": 2.8920161376788656e-08,
-    "maxDistanceDifference": 4.6435723322080236e-11,
+    "maxUvDifference": 1.2713857078239243e-08,
+    "maxDistanceDifference": 1.0330278299441886e-12,
     "sameFaceLetters": true,
     "seamReadable": true,
     "uvInvariant": true
@@ -51,19 +51,19 @@
         "t0": 0.0,
         "t1": 0.5897435897435898,
         "arc0": 0.0,
-        "arc1": 2.0019339369726676,
+        "arc1": 2.001933937315609,
         "uvStart": [
-          0.9849999999961097,
-          2.9499999824659984
+          0.9849999999997606,
+          2.949999998921375
         ],
         "uvEnd": [
           0.0,
           2.9712106916319527
         ],
         "xyzStart": [
-          1.7335907574036218,
-          1.0325384260967496,
-          -1.1819542742602152
+          1.7335907563497592,
+          1.0325384257290937,
+          -1.1819542760420996
         ],
         "xyzEnd": [
           0.7451289656498993,
@@ -78,8 +78,6 @@
     "warnings": [
       "[body] GLOBAL_OPTIMUM_NOT_GUARANTEED_RESTRICTED_SEARCH:finite seeds may miss a basin on a non-convex surface",
       "[spout] GLOBAL_OPTIMUM_NOT_GUARANTEED_RESTRICTED_SEARCH:finite seeds may miss a basin on a non-convex surface",
-      "index 20: body closer but switch not authorized; keeping spout",
-      "index 21: body closer but switch not authorized; keeping spout",
       "index 22: body closer but switch not authorized; keeping spout",
       "index 23: body closer but switch not authorized; keeping spout",
       "index 23: spout domain exit BEYOND_U_MIN; continuous-only edit, no switch allowed -> clipped",
@@ -99,7 +97,107 @@
       "index 37: body closer but switch not authorized; keeping spout",
       "index 38: body closer but switch not authorized; keeping spout",
       "index 39: body closer but switch not authorized; keeping spout"
-    ]
+    ],
+    "branchSummary": {
+      "strategy": "auto",
+      "surfaces": {
+        "body": {
+          "chosenStrategy": "path",
+          "strategyComparison": {
+            "mode": "measured-min-total-cost",
+            "totals": {
+              "neighbor": 48.154960395358714,
+              "path": 48.154960395316316
+            },
+            "chosen": "path",
+            "routesAgree": false
+          },
+          "stats": {
+            "samples": 40,
+            "candidateTotal": 474,
+            "ambiguousSamples": 40,
+            "maxParamStep": 0.06621154339321751,
+            "medianParamStep": 0.011680003594429923,
+            "maxXyzStep": 0.2087024351089297,
+            "branchSwitches": 0,
+            "recoveries": 0,
+            "oobSamples": 0,
+            "breaks": 0,
+            "unresolvedLosses": 0,
+            "anchoredSamples": 0,
+            "lockedSamples": 0,
+            "totalCost": 48.154960395316316,
+            "distanceSum": 14.700984433840873,
+            "fullSolves": 40,
+            "warmSolves": 0
+          },
+          "breaks": [],
+          "attachmentError": {
+            "maxOrthoRel": 2.6502423059198782e-08,
+            "maxInteriorOrthoRel": 2.6502423059198782e-08,
+            "maxSurfaceReprojectionError": 0.0,
+            "onSurfaceSamples": 0,
+            "boundarySamples": 0,
+            "maxDistance": 1.2303043082966576,
+            "meanDistance": 0.36752461084602184
+          }
+        },
+        "spout": {
+          "chosenStrategy": "path",
+          "strategyComparison": {
+            "mode": "measured-min-total-cost",
+            "totals": {
+              "neighbor": 59.25346440440657,
+              "path": 59.25346440433154
+            },
+            "chosen": "path",
+            "routesAgree": false
+          },
+          "stats": {
+            "samples": 40,
+            "candidateTotal": 513,
+            "ambiguousSamples": 40,
+            "maxParamStep": 0.07330927595217634,
+            "medianParamStep": 0.04119047618927697,
+            "maxXyzStep": 0.1774062781067767,
+            "branchSwitches": 0,
+            "recoveries": 0,
+            "oobSamples": 17,
+            "breaks": 0,
+            "unresolvedLosses": 0,
+            "anchoredSamples": 0,
+            "lockedSamples": 0,
+            "totalCost": 59.25346440433154,
+            "distanceSum": 12.782023140856609,
+            "fullSolves": 40,
+            "warmSolves": 0
+          },
+          "breaks": [],
+          "attachmentError": {
+            "maxOrthoRel": 0.8975201491503656,
+            "maxInteriorOrthoRel": 5.588870511852728e-09,
+            "maxSurfaceReprojectionError": 0.0,
+            "onSurfaceSamples": 0,
+            "boundarySamples": 17,
+            "maxDistance": 0.8734287901478696,
+            "meanDistance": 0.3195505785214152
+          }
+        }
+      },
+      "totalBreaks": 0,
+      "ambiguousSamples": {
+        "body": 40,
+        "spout": 40
+      },
+      "branchSwitches": {
+        "body": 0,
+        "spout": 0
+      },
+      "recoveries": {
+        "body": 0,
+        "spout": 0
+      }
+    }
   },
   "B": {
     "faceLetters": {
@@ -120,11 +218,11 @@
       "hasSeam": true,
       "fromSurface": "spout",
       "toSurface": "body",
-      "seamArc": 1.7019226391541076,
-      "physicalGap": 0.049894428396296056,
-      "tangentAngleDeg": 25.39388578655546,
-      "sideAngleDeg": 6.217383750668255,
-      "registrationGap": 0.12238040990665602,
+      "seamArc": 1.7019226394599483,
+      "physicalGap": 0.04989442844169875,
+      "tangentAngleDeg": 25.39388584055342,
+      "sideAngleDeg": 6.217382679240848,
+      "registrationGap": 0.1186758224247602,
       "readable": true,
       "thresholds": {
         "gap": 0.14,
@@ -138,20 +236,21 @@
         "reason": "USER_TRANSITION_LINE",
         "context": "LINE_CROSSING",
         "previousOobReason": null,
-        "matchDistance": 1.630989251805361e-10,
+        "matchDistance": 3.0564589643071805e-10,
         "targetUv": [
-          0.3093512897836852,
-          0.0481688920062569
+          0.30935128977521015,
+          0.0481688917511702
         ],
-        "targetDistance": 0.049894428396296056
+        "targetDistance": 0.04989442844169875,
+        "targetBranchStatus": "attached"
       }
     },
     "distortion": {
       "available": true,
-      "areaRatioMin": 0.9980087604172354,
-      "areaRatioMax": 1.01172236947901,
-      "areaRatioMean": 1.0049435285607553,
-      "anisotropyMax": 1.0072344423316337
+      "areaRatioMin": 0.9980087604299136,
+      "areaRatioMax": 1.011722369931729,
+      "areaRatioMean": 1.00494352868258,
+      "anisotropyMax": 1.007234442602368
     },
     "intervals": [
       {
@@ -161,31 +260,31 @@
         "t0": 0.0,
         "t1": 0.5384615384615384,
         "arc0": 0.0,
-        "arc1": 1.7019226391541076,
+        "arc1": 1.7019226394599483,
         "uvStart": [
-          0.9849999999961097,
-          2.9499999824659984
+          0.9849999999997606,
+          2.949999998921375
         ],
         "uvEnd": [
-          0.1200000000006733,
-          2.9499999994333166
+          0.11999999999878225,
+          2.950000001061963
         ],
         "xyzStart": [
-          1.7335907574036218,
-          1.0325384260967496,
-          -1.1819542742602152
+          1.7335907563497592,
+          1.0325384257290937,
+          -1.1819542760420996
         ],
         "xyzEnd": [
-          0.9632195662889879,
-          -0.34389021654733487,
-          -0.6063499179743834
+          0.9632195660650505,
+          -0.34389021662289615,
+          -0.606349918379185
         ],
         "endReason": "LINE_CROSSING",
         "startReason": "initial-pick",
         "switchInfo": {
           "fromIndex": 1,
           "toIndex": 3,
-          "matchDistance": 1.630989251805361e-10,
+          "matchDistance": 3.0564589643071805e-10,
           "target": {
             "surfaceId": "body",
             "u": 0.3094,
@@ -204,25 +303,25 @@
         "index1": 39,
         "t0": 0.5384615384615384,
         "t1": 1.0,
-        "arc0": 1.7019226391541076,
-        "arc1": 3.0238438257593723,
+        "arc0": 1.7019226394599483,
+        "arc1": 3.023843824336905,
         "uvStart": [
-          0.3093512897836852,
-          0.0481688920062569
+          0.30935128977521015,
+          0.0481688917511702
         ],
         "uvEnd": [
-          0.0009999997755267564,
-          1.1627833781442303
+          0.001000000000495204,
+          1.1627833748423455
         ],
         "xyzStart": [
-          0.9225342787256267,
-          -0.3305406388596071,
-          -0.5807383944656376
+          0.9225342785709317,
+          -0.3305406388875066,
+          -0.5807383946968366
         ],
         "xyzEnd": [
-          0.3937669513545111,
-          -0.8599130381919031,
-          0.24293113980019654
+          0.3937669526687604,
+          -0.8599130381723281,
+          0.24293113881597062
         ],
         "endReason": null,
         "startReason": "initial-pick",
@@ -237,20 +336,119 @@
         "reason": "USER_TRANSITION_LINE",
         "context": "LINE_CROSSING",
         "previousOobReason": null,
-        "matchDistance": 1.630989251805361e-10,
+        "matchDistance": 3.0564589643071805e-10,
         "targetUv": [
-          0.3093512897836852,
-          0.0481688920062569
+          0.30935128977521015,
+          0.0481688917511702
         ],
-        "targetDistance": 0.049894428396296056
+        "targetDistance": 0.04989442844169875,
+        "targetBranchStatus": "attached"
       }
     ],
     "warnings": [
       "[body] GLOBAL_OPTIMUM_NOT_GUARANTEED_RESTRICTED_SEARCH:finite seeds may miss a basin on a non-convex surface",
-      "[spout] GLOBAL_OPTIMUM_NOT_GUARANTEED_RESTRICTED_SEARCH:finite seeds may miss a basin on a non-convex surface",
-      "index 20: body closer but switch not authorized; keeping spout",
-      "index 21: body closer but switch not authorized; keeping spout"
-    ]
+      "[spout] GLOBAL_OPTIMUM_NOT_GUARANTEED_RESTRICTED_SEARCH:finite seeds may miss a basin on a non-convex surface"
+    ],
+    "branchSummary": {
+      "strategy": "auto",
+      "surfaces": {
+        "body": {
+          "chosenStrategy": "path",
+          "strategyComparison": {
+            "mode": "measured-min-total-cost",
+            "totals": {
+              "neighbor": 48.154960395358714,
+              "path": 48.154960395316316
+            },
+            "chosen": "path",
+            "routesAgree": false
+          },
+          "stats": {
+            "samples": 40,
+            "candidateTotal": 474,
+            "ambiguousSamples": 40,
+            "maxParamStep": 0.06621154339321751,
+            "medianParamStep": 0.011680003594429923,
+            "maxXyzStep": 0.2087024351089297,
+            "branchSwitches": 0,
+            "recoveries": 0,
+            "oobSamples": 0,
+            "breaks": 0,
+            "unresolvedLosses": 0,
+            "anchoredSamples": 0,
+            "lockedSamples": 0,
+            "totalCost": 48.154960395316316,
+            "distanceSum": 14.700984433840873,
+            "fullSolves": 40,
+            "warmSolves": 0
+          },
+          "breaks": [],
+          "attachmentError": {
+            "maxOrthoRel": 2.6502423059198782e-08,
+            "maxInteriorOrthoRel": 2.6502423059198782e-08,
+            "maxSurfaceReprojectionError": 0.0,
+            "onSurfaceSamples": 0,
+            "boundarySamples": 0,
+            "maxDistance": 1.2303043082966576,
+            "meanDistance": 0.36752461084602184
+          }
+        },
+        "spout": {
+          "chosenStrategy": "path",
+          "strategyComparison": {
+            "mode": "measured-min-total-cost",
+            "totals": {
+              "neighbor": 59.25346440440657,
+              "path": 59.25346440433154
+            },
+            "chosen": "path",
+            "routesAgree": false
+          },
+          "stats": {
+            "samples": 40,
+            "candidateTotal": 513,
+            "ambiguousSamples": 40,
+            "maxParamStep": 0.07330927595217634,
+            "medianParamStep": 0.04119047618927697,
+            "maxXyzStep": 0.1774062781067767,
+            "branchSwitches": 0,
+            "recoveries": 0,
+            "oobSamples": 17,
+            "breaks": 0,
+            "unresolvedLosses": 0,
+            "anchoredSamples": 0,
+            "lockedSamples": 0,
+            "totalCost": 59.25346440433154,
+            "distanceSum": 12.782023140856609,
+            "fullSolves": 40,
+            "warmSolves": 0
+          },
+          "breaks": [],
+          "attachmentError": {
+            "maxOrthoRel": 0.8975201491503656,
+            "maxInteriorOrthoRel": 5.588870511852728e-09,
+            "maxSurfaceReprojectionError": 0.0,
+            "onSurfaceSamples": 0,
+            "boundarySamples": 17,
+            "maxDistance": 0.8734287901478696,
+            "meanDistance": 0.3195505785214152
+          }
+        }
+      },
+      "totalBreaks": 0,
+      "ambiguousSamples": {
+        "body": 40,
+        "spout": 40
+      },
+      "branchSwitches": {
+        "body": 0,
+        "spout": 0
+      },
+      "recoveries": {
+        "body": 0,
+        "spout": 0
+      }
+    }
   },
   "files": {
     "A": {

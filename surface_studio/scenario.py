@@ -180,3 +180,44 @@ def singularity_design_curve(samples: int = 31, phi0: float = 1.0):
             phi = phi0 + math.pi
         pts.append(sph.point(theta, phi))
     return sph, pts
+
+
+def foldback_tracking_case(samples: int = 30, half_span: float = 0.6, height: float = 2.0):
+    """Design curve above a hairpin fold that crosses the symmetry plane.
+
+    For every sample away from the fold crest a point on the open side has two
+    near-equal closest candidates (the two sheets).  Nearest-point selection
+    therefore flips sheets at the symmetry plane; branch tracking must keep one
+    branch and report the break where that branch genuinely ends.
+    """
+    surf = FoldbackSurface()
+    pts = [
+        (-half_span + 2.0 * half_span * k / (samples - 1), height, 0.0)
+        for k in range(samples)
+    ]
+    return surf, pts
+
+
+def equidistant_candidates_case(samples: int = 21):
+    """Straight line exactly above the fold crest: two symmetric candidates.
+
+    Every sample has mirrored closest points with identical distance, which is
+    the cleanest test that equal distance alone never changes the branch.
+    """
+    surf = FoldbackSurface()
+    pts = [(0.0, 2.0, -0.6 + 1.2 * k / (samples - 1)) for k in range(samples)]
+    return surf, pts
+
+
+def boundary_tracking_case(samples: int = 25):
+    """Design curve sweeping sideways out of the fold's parameter domain.
+
+    Used to check that branch identity and boundary-exit reporting still work
+    when the route runs along the parameter boundary.
+    """
+    surf = FoldbackSurface()
+    pts = [
+        (1.0 + 2.0 * k / (samples - 1), 2.0, 0.5)
+        for k in range(samples)
+    ]
+    return surf, pts

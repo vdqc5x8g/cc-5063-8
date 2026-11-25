@@ -14,10 +14,12 @@ from .projection import make_transition_line, project_curve
 from .scenario import (
     build_teapot,
     design_curve_samples,
+    foldback_tracking_case,
     preset_transition,
     preset_transition_uv,
     singularity_design_curve,
 )
+from .branches import track_surface
 from .solver import closest, select_singular_branch
 from .surfaces import FoldbackSurface, PlaneSurface, make_curved_patch
 
@@ -58,6 +60,8 @@ def state_payload(yaw_rad: float) -> dict:
             for s in surfaces
         ],
         "designPoints": [list(p) for p in design_curve_samples(yaw_rad)],
+        "branchStrategyOptions": ["auto", "neighbor", "path"],
+        "defaultBranchStrategy": "auto",
         "presetTransitionUv": preset_transition_uv(),
         "transition": [p.to_dict() for p in preset_transition(yaw_rad)],
         "pattern": build_pattern("TEAPOT"),
@@ -82,6 +86,11 @@ def project_payload(body: dict) -> dict:
         elif raw_line:
             transition = make_transition_line(raw_line, smap)
 
+    strategy = str(body.get("branchStrategy", "auto")).lower()
+    if strategy not in ("auto", "neighbor", "path"):
+        strategy = "auto"
+    anchors = body.get("branchAnchors") or None
+
     outcome = project_curve(
         surfaces,
         points,
@@ -89,6 +98,8 @@ def project_payload(body: dict) -> dict:
         initial_surface_id=body.get("initialSurfaceId", "spout"),
         transition=transition,
         tie_tol=float(body.get("tieTol", 2e-3)),
+        branch_strategy=strategy,
+        branch_anchors=anchors,
     )
     decal = map_decal(build_pattern("TEAPOT"), outcome, surfaces, att)
     return {
@@ -170,6 +181,40 @@ def diagnose_payload() -> dict:
             "chosenU": sel["chosen"]["u"],
             "chosenV": sel["chosen"]["v"],
             "ambiguous": sel["ambiguous"],
+        },
+    })
+
+    # Path-level branch tracking across the pole: the route must stay on one
+    # continuous meridian instead of jumping between equivalent branches.
+    folded, fold_pts = foldback_tracking_case()
+    fold_track = track_surface(folded, fold_pts, strategy="path")
+    items.append({
+        "id": "foldbackBranch",
+        "label": "折返多解：路径级分支选择与断点报告",
+        "pass": (
+            fold_track.stats["ambiguousSamples"] >= len(fold_pts) - 2
+            and fold_track.real_attachment_error["maxOrthoRel"] < 1e-5
+        ),
+        "metrics": {
+            "chosenStrategy": fold_track.strategy,
+            "ambiguousSamples": fold_track.stats["ambiguousSamples"],
+            "breaks": len(fold_track.breaks),
+            "maxOrthoRel": fold_track.real_attachment_error["maxOrthoRel"],
+            "strategyTotals": fold_track.comparison["totals"],
+        },
+    })
+
+    sphere_track = track_surface(sphere, sphere_points, strategy="path")
+    v_un = [f.v_unwrapped for f in sphere_track.frames]
+    items.append({
+        "id": "sphereBranchRoute",
+        "label": "奇点路径：过接缝后维持连续分支（不跳栏）",
+        "pass": all(b >= a - 1e-6 for a, b in zip(v_un, v_un[1:])),
+        "metrics": {
+            "breaks": len(sphere_track.breaks),
+            "vStart": v_un[0],
+            "vEnd": v_un[-1],
+            "recoveries": sphere_track.stats["recoveries"],
         },
     })
     return {"items": items, "allPass": all(x["pass"] for x in items)}

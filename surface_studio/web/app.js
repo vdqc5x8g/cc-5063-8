@@ -12,6 +12,10 @@
     att: { offset: 1.7, lateral: 0, scale: 0.24, angleDeg: 0 },
     picks: [],
     pickMode: false,
+    anchors: [],
+    anchorMode: false,
+    branchStrategy: "auto",
+    hoverIndex: null,
     camera: { yaw: 0.52, pitch: 0.30, zoom: 170, target: [0.05, 0.16, -0.05] },
     patternView: { unit: 80 },
     viewDrag: null,
@@ -170,6 +174,83 @@
     }
   }
 
+  function drawBranchOverlay(ctx, proj, projection) {
+    const tracks = projection.tracks || {};
+    const hover = state.hoverIndex;
+    for (const sid of Object.keys(tracks)) {
+      const track = tracks[sid];
+      for (const frame of track.frames) {
+        const p = projection.points[frame.index];
+        if (!p || p.surfaceId !== sid || !p.xyz) continue;
+        const chosen = proj(p.xyz);
+
+        // Abandoned candidates: faint hollow ring at their world position.
+        if (hover === frame.index) {
+          for (const alt of frame.abandoned || []) {
+            if (!alt.xyz) continue;
+            const q = proj(alt.xyz);
+            ctx.beginPath();
+            ctx.arc(q.x, q.y, 3.6, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(100,116,139,.85)";
+            ctx.lineWidth = 1.2;
+            ctx.setLineDash([2, 2]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        }
+
+        if (frame.status === "anchored" || frame.locked) {
+          ctx.beginPath();
+          ctx.arc(chosen.x, chosen.y, 5.2, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(234,179,8,.92)";
+          ctx.fill();
+          ctx.lineWidth = 1.6;
+          ctx.strokeStyle = "#a16207";
+          ctx.stroke();
+        }
+        if (frame.recovery) {
+          ctx.beginPath();
+          ctx.arc(chosen.x, chosen.y, 6, 0, Math.PI * 2);
+          ctx.strokeStyle = "#0891b2";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        if (frame.status === "branch-switch" || frame.status === "break") {
+          const q = chosen;
+          ctx.strokeStyle = frame.status === "break" ? "#b91c1c" : "#7c3aed";
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          ctx.moveTo(q.x - 6, q.y - 6); ctx.lineTo(q.x + 6, q.y + 6);
+          ctx.moveTo(q.x + 6, q.y - 6); ctx.lineTo(q.x - 6, q.y + 6);
+          ctx.stroke();
+        }
+        if (hover === frame.index) {
+          ctx.beginPath();
+          ctx.arc(chosen.x, chosen.y, 7.5, 0, Math.PI * 2);
+          ctx.strokeStyle = "#0f172a";
+          ctx.lineWidth = 1.4;
+          ctx.stroke();
+        }
+      }
+    }
+
+    for (const anchor of state.anchors) {
+      if (!anchor.xyz) continue;
+      const q = proj(anchor.xyz);
+      ctx.save();
+      ctx.translate(q.x, q.y);
+      ctx.beginPath();
+      ctx.moveTo(0, -8); ctx.lineTo(7, 0); ctx.lineTo(0, 8); ctx.lineTo(-7, 0);
+      ctx.closePath();
+      ctx.fillStyle = "#eab308";
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   function renderView() {
     const canvas = $("view3d");
     const { ctx, w, h } = setupCanvas(canvas);
@@ -250,6 +331,9 @@
         ctx.moveTo(q.x + 5, q.y - 5); ctx.lineTo(q.x - 5, q.y + 5);
         ctx.stroke();
       }
+
+      // Branch tracking: abandoned candidates, locked anchors, and breaks.
+      drawBranchOverlay(ctx, proj, projection);
 
       for (const run of state.data.decal.runs) {
         drawWorldPolyline(ctx, run.xyz, proj, {
@@ -476,6 +560,85 @@
       </div>`).join("") || `<p class="tiny">尚未设置转接线拾取点。</p>`;
   }
 
+  function renderAnchors() {
+    const root = $("anchorList");
+    if (!root) return;
+    root.innerHTML = state.anchors.length ? state.anchors.map((a, i) => `
+      <div class="pick-chip ${a.surfaceId} anchor-chip">
+        <span>锚点 ${i + 1} · ${a.surfaceId} @ #${a.index}</span>
+        <span>u ${a.u.toFixed(3)} · v ${a.v.toFixed(3)}</span>
+      </div>`).join("") : "";
+  }
+
+  const STRATEGY_LABELS = {
+    auto: "自动（实测择优）",
+    neighbor: "邻域延续",
+    path: "路径约束",
+  };
+
+  function renderBranchReport() {
+    const root = $("branchReport");
+    if (!root) return;
+    const projection = state.data ? state.data.projection : null;
+    const summary = projection ? projection.branchSummary : null;
+    if (!summary) {
+      root.innerHTML = `<h2>分支跟踪</h2>
+        <p class="tiny">运行投影后显示：候选数、被放弃的候选、选择依据与断点。</p>`;
+      return;
+    }
+    const sids = Object.keys(summary.surfaces || {});
+    const rows = sids.map((sid) => {
+      const s = summary.surfaces[sid];
+      const stats = s.stats || {};
+      const err = s.attachmentError || {};
+      const breaks = s.breaks || [];
+      const comp = s.strategyComparison || {};
+      const totals = comp.totals || {};
+      const chosen = s.chosenStrategy || summary.strategy;
+      return `
+        <tr class="branch-surface-row">
+          <td><strong style="color:${colorFor(sid)}">${sid}</strong><br>
+            <span class="muted">${STRATEGY_LABELS[chosen] || chosen}</span></td>
+          <td class="mono">
+            候选 ${stats.ambiguousSamples || 0}/${stats.samples || 0} 样本多解<br>
+            换支 ${stats.branchSwitches || 0} · 恢复 ${stats.recoveries || 0} · 锁定 ${stats.lockedSamples || 0}<br>
+            断点 ${breaks.length}
+          </td>
+          <td class="mono">
+            内点正交 ${fmt(err.maxInteriorOrthoRel !== undefined ? err.maxInteriorOrthoRel : err.maxOrthoRel, 2)}e0<br>
+            重投影 ≤ ${fmt(err.maxSurfaceReprojectionError, 2)}
+            ${err.onSurfaceSamples ? `<br><span class="muted">贴面样本 ${err.onSurfaceSamples}</span>` : ""}
+            ${err.boundarySamples ? `<br><span class="muted">边界极小 ${err.boundarySamples}</span>` : ""}
+          </td>
+        </tr>
+        <tr class="branch-basis-row">
+          <td colspan="3">
+            <span class="muted">选择依据（实测比较）：</span>
+            ${Object.entries(totals).map(([name, t]) =>
+              `<span class="strategy-chip ${name === chosen ? "chosen" : ""}"
+                title="总代价 = 距离 + 连续性 + 切换惩罚">${STRATEGY_LABELS[name] || name}
+                ${typeof t === "object" ? fmt(t.total, 3) : fmt(t, 3)}</span>`).join("")}
+            ${breaks.length ? `<span class="badge-fail">${breaks.length} 处不连续（未用平滑掩盖）</span>` : `<span class="badge-pass">连续</span>`}
+          </td>
+        </tr>
+        ${breaks.map((b) => `<tr class="branch-break-row">
+          <td colspan="3">
+            <span class="badge-fail">断点 @ #${b.afterIndex}</span>
+            <span class="muted">${b.kind} · xyz 跳变 ${fmt(b.xyzJump, 3)} · 参数跳变 ${fmt(b.paramJump, 3)}</span>
+          </td></tr>`).join("")}
+      `;
+    }).join("");
+
+    root.innerHTML = `
+      <h2>分支跟踪</h2>
+      <p class="tiny">策略 ${STRATEGY_LABELS[summary.strategy] || summary.strategy} ·
+        总断点 ${summary.totalBreaks} · 多解样本 ${Object.values(summary.ambiguousSamples || {}).reduce((a, b) => a + b, 0)}。
+        悬停曲面轨迹可查看被放弃的候选。</p>
+      <table class="kv branch-table">${rows}</table>
+      ${state.anchors.length ? `<p class="tiny">当前 ${state.anchors.length} 个分支锚点参与锁定。</p>` : ""}
+    `;
+  }
+
   function renderExportLinks(urls) {
     if (!urls) return;
     const stamp = Date.now();
@@ -490,12 +653,98 @@
     $("exportLinks").innerHTML = html;
   }
 
+  function updateHover(event) {
+    const projection = state.data ? state.data.projection : null;
+    if (!projection || !state.server) return;
+    const canvas = $("view3d");
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+    const sx = event.clientX - rect.left;
+    const sy = event.clientY - rect.top;
+    let best = null;
+    for (const p of projection.points) {
+      if (!p.xyz || p.status === "oob") continue;
+      const q = projectPoint(p.xyz, state.camera, w, h);
+      const d = Math.hypot(q.x - sx, q.y - sy);
+      if (d < 14 && (!best || d < best.d)) best = { d, index: p.index };
+    }
+    const next = best ? best.index : null;
+    if (next !== state.hoverIndex) {
+      state.hoverIndex = next;
+      renderView();
+      renderHoverInfo();
+    }
+  }
+
+  function renderHoverInfo() {
+    updateBranchOverlay();
+  }
+
+  function hoverHtml(projection) {
+    if (state.hoverIndex === null) return "";
+    const p = projection.points[state.hoverIndex];
+    if (!p || !p.branch) return "";
+    const b = p.branch;
+    const alts = (b.abandoned || []).map((c) =>
+      `<span class="cand-chip">u ${c.u.toFixed(3)}, v ${c.v.toFixed(3)} · d ${c.distance.toFixed(4)}${c.oobReason ? ` · ${c.oobReason}` : ""}</span>`
+    ).join("");
+    return `
+      <span class="overlay-line strong">
+        样本 #${p.index} · ${b.surfaceId} · ${STRATEGY_LABELS[b.strategy] || b.strategy}
+      </span>
+      <span class="overlay-line">
+        采用 u ${p.u.toFixed(3)}, v ${p.v.toFixed(3)} · 状态 ${b.status}
+        ${b.anchored ? " · 锚定" : ""}${b.locked ? " · 锁定" : ""}
+        ${b.reason ? ` · ${b.reason}` : ""}
+      </span>
+      ${alts ? `<span class="overlay-line subdued">放弃候选 ${b.abandoned.length} 个：${alts}</span>` : ""}
+    `;
+  }
+
   function renderAll() {
     renderView();
     renderPattern();
     renderDistortion();
     renderReport();
+    renderBranchReport();
     renderPicks();
+    renderAnchors();
+    updateBranchOverlay();
+  }
+
+  function updateBranchOverlay() {
+    const el = $("branchOverlay");
+    if (!el) return;
+    const projection = state.data ? state.data.projection : null;
+    if (!projection) {
+      el.classList.add("hidden");
+      return;
+    }
+    el.classList.remove("hidden");
+    const summary = projection.branchSummary || {};
+    const totalBreaks = summary.totalBreaks || 0;
+    const ambiguous = Object.values(summary.ambiguousSamples || {}).reduce((a, b) => a + b, 0);
+    const anomalies = [];
+    for (const [sid, s] of Object.entries(summary.surfaces || {})) {
+      const err = s.attachmentError || {};
+      if ((s.breaks || []).length) anomalies.push(`${sid} 轨迹断点 ×${s.breaks.length}`);
+      // Only interior minima must satisfy the normal condition; a verified
+      // boundary minimum legitimately leaves a residual along its free direction.
+      const interiorOrtho = err.maxInteriorOrthoRel !== undefined
+        ? err.maxInteriorOrthoRel : (err.maxOrthoRel || 0);
+      if (interiorOrtho > 1e-4) anomalies.push(`${sid} 内点正交残差 ${interiorOrtho.toExponential(1)}`);
+      const stats = s.stats || {};
+      if ((stats.recoveries || 0) > 0) anomalies.push(`${sid} 丢失后恢复 ×${stats.recoveries}`);
+    }
+    el.innerHTML = `
+      <span class="overlay-line ${totalBreaks ? "bad" : "ok"}">
+        分支跟踪 · ${STRATEGY_LABELS[projection.strategy] || projection.strategy} ·
+        多解样本 ${ambiguous} · 断点 ${totalBreaks}
+      </span>
+      ${anomalies.length ? `<span class="overlay-line bad">${anomalies.join("；")}</span>` : ""}
+      ${hoverHtml(projection)}
+    `;
+    el.classList.toggle("with-hover", state.hoverIndex !== null);
   }
 
   function syncControlValues() {
@@ -541,6 +790,10 @@
         mode: state.mode === "A" ? "spout_only" : "transition",
         attachment: state.att,
         transitionUv: state.picks.map((p) => ({ surfaceId: p.surfaceId, u: p.u, v: p.v })),
+        branchStrategy: state.branchStrategy,
+        branchAnchors: state.anchors.map((a) => ({
+          surfaceId: a.surfaceId, index: a.index, u: a.u, v: a.v,
+        })),
         usePreset: false,
       });
       state.data = payload;
@@ -590,6 +843,88 @@
     }
   }
 
+  async function handleAnchorPick(event) {
+    const canvas = $("view3d");
+    const rect = canvas.getBoundingClientRect();
+    const ray = screenToRay(
+      event.clientX - rect.left, event.clientY - rect.top, rect.width, rect.height
+    );
+    const info = $("pickInfo");
+    info.classList.remove("hidden");
+    info.textContent = "正在拾取分支锚点：复核 UV 与候选分支…";
+    try {
+      const res = await request("/api/pick", {
+        yawRad: state.yawRad, origin: ray.origin, direction: ray.direction,
+      });
+      if (!res.hit) {
+        info.textContent = "射线未命中曲面，无法放置锚点。";
+        return;
+      }
+      const hit = res.pick;
+      const projection = state.data ? state.data.projection : null;
+      const track = projection && projection.tracks ? projection.tracks[hit.surfaceId] : null;
+      let index = null;
+      let branch = { u: hit.u, v: hit.v };
+      let which = "拾取 UV";
+      if (track && track.frames.length) {
+        // Snap to the design sample whose candidate is nearest the clicked point;
+        // among that sample's candidates prefer the one nearest the pick UV, so
+        // the user can anchor an abandoned branch explicitly.
+        let best = null;
+        for (const frame of track.frames) {
+          for (const cand of frame.candidates.concat([frame.chosen])) {
+            if (!cand || !cand.xyz) continue;
+            const d = Math.hypot(
+              cand.xyz[0] - hit.xyz[0],
+              cand.xyz[1] - hit.xyz[1],
+              cand.xyz[2] - hit.xyz[2],
+            );
+            if (!best || d < best.d) best = { d, frame, cand };
+          }
+        }
+        if (best) {
+          index = best.frame.index;
+          const usable = (c) => c.converged && !(c.oobReasons && c.oobReasons.length);
+          const cands = best.frame.candidates.filter(usable);
+          const pool = cands.length ? cands : [best.cand];
+          const pickCand = pool.reduce((a, b) => {
+            const da = Math.abs(a.u - hit.u) + Math.abs(a.v - hit.v);
+            const db = Math.abs(b.u - hit.u) + Math.abs(b.v - hit.v);
+            return db < da ? b : a;
+          });
+          branch = { u: pickCand.u, v: pickCand.v };
+          which = best.frame.candidates.length > 1
+            ? `多解样本（${best.frame.candidates.length} 个候选）`
+            : "单候选样本";
+        }
+      }
+      if (index === null) {
+        // No projection yet: fall back to nearest design sample by world distance.
+        const design = state.server.designPoints || [];
+        let bi = 0, bd = Infinity;
+        design.forEach((p, i) => {
+          const d = Math.hypot(p[0] - hit.xyz[0], p[1] - hit.xyz[1], p[2] - hit.xyz[2]);
+          if (d < bd) { bd = d; bi = i; }
+        });
+        index = bi;
+      }
+      const existing = state.anchors.findIndex(
+        (a) => a.surfaceId === hit.surfaceId && a.index === index
+      );
+      const record = { surfaceId: hit.surfaceId, index, u: branch.u, v: branch.v, xyz: hit.xyz };
+      if (existing >= 0) state.anchors[existing] = record;
+      else state.anchors.push(record);
+      state.anchors.sort((a, b) => a.index - b.index);
+      renderAnchors();
+      renderView();
+      info.innerHTML = `已添加分支锚点：<strong>${hit.surfaceId}</strong> @ #${index}<br>
+        u=${branch.u.toFixed(4)}, v=${branch.v.toFixed(4)} · ${which}`;
+      scheduleProject();
+    } catch (err) {
+      info.textContent = `锚点拾取失败：${err.message}`;
+    }
+  }
+
   function bindControls() {
     $("runA").addEventListener("click", () => runProject("A"));
     $("runB").addEventListener("click", () => runProject("B"));
@@ -607,8 +942,32 @@
     });
     $("pickToggle").addEventListener("click", (e) => {
       state.pickMode = !state.pickMode;
+      if (state.pickMode) {
+        state.anchorMode = false;
+        $("anchorToggle").classList.remove("active");
+        $("view3d").classList.remove("anchoring");
+      }
       e.currentTarget.classList.toggle("active", state.pickMode);
       $("view3d").classList.toggle("picking", state.pickMode);
+    });
+    $("anchorToggle").addEventListener("click", (e) => {
+      state.anchorMode = !state.anchorMode;
+      if (state.anchorMode) {
+        state.pickMode = false;
+        $("pickToggle").classList.remove("active");
+        $("view3d").classList.remove("picking");
+      }
+      e.currentTarget.classList.toggle("active", state.anchorMode);
+      $("view3d").classList.toggle("anchoring", state.anchorMode);
+    });
+    $("clearAnchors").addEventListener("click", () => {
+      state.anchors = [];
+      renderAnchors();
+      scheduleProject();
+    });
+    $("branchStrategy").addEventListener("change", (e) => {
+      state.branchStrategy = e.target.value;
+      scheduleProject();
     });
     $("distSurface").addEventListener("change", renderDistortion);
 
@@ -700,7 +1059,10 @@
     });
     view.addEventListener("pointermove", (e) => {
       const drag = state.viewDrag;
-      if (!drag) return;
+      if (!drag) {
+        updateHover(e);
+        return;
+      }
       const dx = e.clientX - drag.x;
       const dy = e.clientY - drag.y;
       if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
@@ -712,8 +1074,9 @@
       const drag = state.viewDrag;
       view.classList.remove("dragging");
       state.viewDrag = null;
-      if (drag && !drag.moved && state.pickMode) {
-        await handleCanvasPick(e);
+      if (drag && !drag.moved) {
+        if (state.pickMode) await handleCanvasPick(e);
+        else if (state.anchorMode) await handleAnchorPick(e);
       }
     });
     view.addEventListener("pointercancel", () => {

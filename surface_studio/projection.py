@@ -21,14 +21,14 @@ from dataclasses import dataclass, field
 from typing import Optional, Sequence
 
 from . import vecmath as vm
-from .solver import (
-    Candidate,
-    ClosestResult,
-    _interior_solve,
-    closest,
-    select_singular_branch,
+from .branches import (
+    DEFAULT_STRATEGY,
+    STRATEGIES,
+    BranchTrack,
+    TrackFrame,
+    track_surface,
 )
-from .surfaces import ParamSurface
+from .solver import Candidate, ClosestResult, _interior_solve, closest
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +156,7 @@ class RoutePoint:
     switch: Optional[dict] = None
     terminal: bool = False
     warnings: list = field(default_factory=list)
+    branch: Optional[dict] = None
 
     def to_dict(self):
         return {
@@ -176,6 +177,7 @@ class RoutePoint:
             "oobReasons": list(self.oob_reasons),
             "degenerate": self.degenerate,
             "branchSelection": self.branch_selection,
+            "branch": self.branch,
             "distancesBySurface": {
                 k: float(v) for k, v in self.distances_by_surface.items()
             },
@@ -232,8 +234,42 @@ class ProjectionOutcome:
     warnings: list
     tie_holds: list
     surface_order: list
+    tracks: dict = field(default_factory=dict)
+    strategy: str = DEFAULT_STRATEGY
+    branch_summary: dict = field(default_factory=dict)
 
-    def to_dict(self):
+    def to_dict(self, compact: bool = False):
+        if compact:
+            # Sheet exports do not need the full candidate set per sample or the
+            # per-frame track duplicate; the audit lives in report.json and the
+            # live API.  Keep the chosen branch and an abandoned count.
+            def _compacted(point):
+                d = point.to_dict()
+                b = d.get("branch")
+                if b:
+                    kept = {
+                        k: b.get(k) for k in (
+                            "surfaceId", "strategy", "candidateCount", "status",
+                            "reason", "uUnwrapped", "vUnwrapped", "jumpParam",
+                            "jumpXyz", "continuityOk", "anchored", "locked",
+                            "recovery", "distanceCost",
+                        )
+                    }
+                    kept["abandonedCount"] = len(b.get("abandoned") or [])
+                    d["branch"] = kept
+                return d
+            return {
+                "mode": self.mode,
+                "points": [_compacted(p) for p in self.points],
+                "intervals": [i.to_dict() for i in self.intervals],
+                "oobRecords": [_compacted(o) for o in self.oob_records],
+                "switches": self.switches,
+                "warnings": self.warnings,
+                "tieHolds": self.tie_holds,
+                "surfaceOrder": self.surface_order,
+                "strategy": self.strategy,
+                "branchSummary": self.branch_summary,
+            }
         return {
             "mode": self.mode,
             "points": [p.to_dict() for p in self.points],
@@ -243,6 +279,9 @@ class ProjectionOutcome:
             "warnings": self.warnings,
             "tieHolds": self.tie_holds,
             "surfaceOrder": self.surface_order,
+            "strategy": self.strategy,
+            "tracks": {sid: t.to_dict() for sid, t in self.tracks.items()},
+            "branchSummary": self.branch_summary,
         }
 
 
@@ -251,6 +290,67 @@ def _unwrap(prev: Optional[float], raw: float, period: float):
         return raw
     k = round((prev - raw) / period)
     return raw + k * period
+
+
+def _frame_candidate(frame: TrackFrame) -> Candidate:
+    c = frame.candidate
+    return Candidate(
+        u=c.u, v=c.v, xyz=tuple(c.xyz), distance=c.distance,
+        ortho=c.ortho_rel, ortho_rel=c.ortho_rel, location=c.location,
+        oob_reasons=list(c.oob_reasons), converged=c.converged,
+        rank_deficient=c.rank_deficient, normal_degenerate=c.normal_degenerate,
+        seed_kind=c.seed_kind,
+    )
+
+
+def _branch_record(frame: TrackFrame, track: BranchTrack) -> dict:
+    """Compact, auditable summary of the branch decision for one sample."""
+    return {
+        "surfaceId": track.surface_id,
+        "strategy": track.strategy,
+        "candidateCount": len(frame.candidates),
+        "status": frame.status,
+        "reason": frame.reason,
+        "uUnwrapped": frame.u_unwrapped,
+        "vUnwrapped": frame.v_unwrapped,
+        "jumpParam": frame.jump_param,
+        "jumpXyz": frame.jump_xyz,
+        "continuityOk": frame.continuity_ok,
+        "anchored": frame.anchor is not None,
+        "locked": frame.locked,
+        "recovery": frame.recovery,
+        "distanceCost": frame.candidate.distance,
+        "abandoned": frame.alternatives,
+    }
+
+
+def _track_surfaces(
+    surfaces: Sequence[ParamSurface],
+    design_points: Sequence,
+    strategy: str,
+    anchors: Optional[Sequence[dict]],
+) -> dict[str, BranchTrack]:
+    """Solve and track every surface once, before any surface-identity walk."""
+    per_surface_anchors = _anchors_by_surface(anchors)
+    return {
+        s.id: track_surface(
+            s, design_points, strategy=strategy,
+            anchors=per_surface_anchors.get(s.id),
+        )
+        for s in surfaces
+    }
+
+
+def _anchors_by_surface(anchors: Optional[Sequence[dict]]) -> dict[str, list]:
+    out: dict[str, list] = {}
+    if not anchors:
+        return out
+    for a in anchors:
+        sid = a.get("surfaceId")
+        if sid is None:
+            continue
+        out.setdefault(sid, []).append(a)
+    return out
 
 
 def project_curve(
@@ -262,25 +362,49 @@ def project_curve(
     tie_tol: float = 2e-3,
     switch_max_distance: float = 0.8,
     transition_band: float = 0.04,
+    branch_strategy: str = DEFAULT_STRATEGY,
+    branch_anchors: Optional[Sequence[dict]] = None,
 ) -> ProjectionOutcome:
+    """Project the design curve with per-surface branch tracking.
+
+    Each surface is solved and tracked independently first (see
+    :mod:`surface_studio.branches`); the surface-identity walk below then uses
+    the tracked route of the current surface, so the reported point is already
+    a continuous branch choice rather than the nearest single point.
+    """
+    if branch_strategy not in STRATEGIES + ("auto",):
+        raise ValueError(f"unknown branch strategy {branch_strategy!r}")
     smap = {s.id: s for s in surfaces}
     order = [s.id for s in surfaces]
     n = len(design_points)
+    if n == 0:
+        return ProjectionOutcome(
+            mode=mode, points=[], intervals=[], oob_records=[], switches=[],
+            warnings=[], tie_holds=[], surface_order=order,
+            strategy=branch_strategy,
+        )
 
-    first_results = {s.id: closest(s, design_points[0]) for s in surfaces}
+    tracks = _track_surfaces(surfaces, design_points, branch_strategy, branch_anchors)
+
+    first_frame = {sid: t.frames[0] for sid, t in tracks.items()}
     if initial_surface_id and initial_surface_id in smap:
         current_sid = initial_surface_id
     else:
-        current_sid = min(first_results, key=lambda sid: first_results[sid].best.distance)
+        current_sid = min(
+            first_frame, key=lambda sid: first_frame[sid].candidate.distance
+        )
 
-    last_uv: dict[str, tuple[float, float]] = {}
-    last_unwrapped: dict[str, tuple[float, float]] = {}
     records: list[RoutePoint] = []
     intervals: list[Interval] = []
     switches: list[dict] = []
     tie_holds: list[dict] = []
     warnings_all: list[str] = []
     oob_records: list[RoutePoint] = []
+
+    for sid, track in tracks.items():
+        for w in track.warnings:
+            if w not in warnings_all:
+                warnings_all.append(w)
 
     interval_start = 0
     interval_open = True
@@ -291,73 +415,20 @@ def project_curve(
 
     for i, query in enumerate(design_points):
         t = i / max(1, n - 1)
-        if 0 < i < n - 1:
-            travel = vm.normalize(vm.sub(design_points[i + 1], design_points[i - 1]))
-        elif n > 1:
-            travel = vm.normalize(vm.sub(design_points[1], design_points[0]))
-        else:
-            travel = None
+        cur_track = tracks[current_sid]
+        frame = cur_track.frames[i]
+        chosen_cand = _frame_candidate(frame)
 
-        results = {}
-        dists = {}
-
-        def solve_one(s: ParamSurface):
-            warm = last_uv.get(s.id)
-            run_full = warm is None or i == 0 or i % 7 == 0
-            if run_full:
-                return closest(s, query, warm_uv=warm)
-            cand = _interior_solve(s, query, warm[0], warm[1], "warm")
-            if cand.location != "interior" or not cand.converged or cand.rank_deficient:
-                return closest(s, query, warm_uv=warm)
-            return ClosestResult(
-                surface_id=s.id, query=tuple(query), best=cand, candidates=[cand],
-                branches=[], degenerate=False, global_guaranteed=s.kind == "plane",
-                search_strategy="warm-lm", warnings=[], seed_count=1,
-            )
-
-        for s in surfaces:
-            res = solve_one(s)
-            results[s.id] = res
-            dists[s.id] = res.best.distance
-            last_uv[s.id] = (res.best.u, res.best.v)
-            for warning in res.warnings:
-                stamped = f"[{s.id}] {warning}"
-                if stamped not in warnings_all:
-                    warnings_all.append(stamped)
-        cur_res = results[current_sid]
-        global_best = cur_res.best
-
-        # Continuity-aware candidate selection (no basin jumps for a hair).
-        best = global_best
-        warm_cur = None
-        if records:
-            warm_cur = (records[-1].u, records[-1].v)
-        if warm_cur is not None and len(cur_res.candidates) > 1:
-            ur = max(smap[current_sid].u1 - smap[current_sid].u0, 1e-12)
-            vr = max(smap[current_sid].v1 - smap[current_sid].v0, 1e-12)
-            vper = smap[current_sid].v1 - smap[current_sid].v0 if smap[current_sid].periodic_v else 0.0
-
-            def jump_of(c: Candidate):
-                cv = _unwrap(warm_cur[1], c.v, vper)
-                wv = _unwrap(warm_cur[1], warm_cur[1], vper)
-                return math.hypot((c.u - warm_cur[0]) / ur, (cv - wv) / vr)
-
-            best_jump = jump_of(global_best)
-            tol_d = max(0.03, 0.15 * global_best.distance + 1e-6)
-            near = [
-                c for c in cur_res.candidates
-                if c.distance <= global_best.distance + tol_d and jump_of(c) < best_jump - 0.02
-            ]
-            if near:
-                cont = min(near, key=jump_of)
-                if jump_of(cont) < 0.5:
-                    best = cont
+        dists = {
+            sid: tracks[sid].frames[i].candidate.distance for sid in order
+        }
 
         rec = RoutePoint(
             index=i, t=t, query=tuple(query),
             status="attached" if interval_open else "oob",
             surface_id=current_sid,
             distances_by_surface={k: float(v) for k, v in dists.items()},
+            branch=_branch_record(frame, cur_track),
         )
 
         other = min(
@@ -366,44 +437,27 @@ def project_curve(
         )
         if other is not None:
             osid, od = other
-            if abs(od - best.distance) <= tie_tol:
+            if abs(od - chosen_cand.distance) <= tie_tol:
                 rec.tie_hold = True
                 tie_holds.append({
                     "index": i, "heldSurface": current_sid, "tiedSurface": osid,
-                    "distanceCurrent": best.distance, "distanceTied": od,
+                    "distanceCurrent": chosen_cand.distance, "distanceTied": od,
                     "action": "identity_held_equal_distance_no_auto_switch",
                 })
-            elif od + tie_tol < best.distance:
+            elif od + tie_tol < chosen_cand.distance:
                 w = (f"index {i}: {osid} closer but switch not authorized; "
                      f"keeping {current_sid}")
                 rec.warnings.append(w)
                 warnings_all.append(w)
 
-        chosen_cand = best
-        if cur_res.degenerate and cur_res.branches:
-            sel = select_singular_branch(
-                smap[current_sid], cur_res,
-                travel_dir_xyz=travel, prev_uv=warm_cur,
-            )
-            rec.branch_selection = {
-                "ambiguous": sel["ambiguous"],
-                "candidateCount": len(sel["scores"]),
-                "chosenV": sel["chosen"]["v"],
-                "scores": [
-                    {"v": sc["branch"]["v"], "continuityCost": sc["continuityCost"],
-                     "distortionCost": sc["distortionCost"], "total": sc["total"]}
-                    for sc in sel["scores"]
-                ],
-            }
-            ch = sel["chosen"]
-            chosen_cand = Candidate(
-                u=ch["u"], v=ch["v"], xyz=tuple(ch["xyz"]),
-                distance=ch["distance"], ortho=ch["ortho"], ortho_rel=ch["ortho_rel"],
-                location=ch.get("location", "singularity"),
-                oob_reasons=ch.get("oob_reasons", []) or [],
-                normal_degenerate=True, rank_deficient=True, seed_kind="selected-branch",
-            )
+        if frame.candidate.rank_deficient or frame.candidate.normal_degenerate:
             rec.degenerate = True
+            rec.branch_selection = {
+                "ambiguous": frame.ambiguous,
+                "candidateCount": len(frame.candidates),
+                "chosenV": frame.candidate.v,
+                "strategy": cur_track.strategy,
+            }
 
         u_c, v_c = chosen_cand.u, chosen_cand.v
         rec.u, rec.v = u_c, v_c
@@ -412,17 +466,8 @@ def project_curve(
         rec.ortho_rel = chosen_cand.ortho_rel
         rec.location = chosen_cand.location
         rec.oob_reasons = list(chosen_cand.oob_reasons)
-
-        surf = smap[current_sid]
-        prev_un = last_unwrapped.get(current_sid)
-        if prev_un is not None:
-            uu = _unwrap(prev_un[0], u_c, surf.u1 - surf.u0 if surf.periodic_u else 0.0)
-            vv = _unwrap(prev_un[1], v_c, surf.v1 - surf.v0 if surf.periodic_v else 0.0)
-        else:
-            uu, vv = u_c, v_c
-        rec.u_unwrapped, rec.v_unwrapped = uu, vv
-        last_uv[current_sid] = (u_c, v_c)
-        last_unwrapped[current_sid] = (uu, vv)
+        rec.u_unwrapped = frame.u_unwrapped
+        rec.v_unwrapped = frame.v_unwrapped
 
         if interval_open and prev_attached_xyz is not None:
             arc_global += vm.dist(prev_attached_xyz, rec.xyz)
@@ -437,10 +482,12 @@ def project_curve(
             records.append(rec)
             continue
 
-        def build_interval(end_i: int, end_u: float, end_v: float, reason, sw_info):
+        def build_interval(end_i, end_u, end_v, reason, sw_info, surf_id=None):
+            sid = surf_id or current_sid
+            surf = smap[sid]
             start_rec = records[interval_start] if interval_start < len(records) else rec
             return Interval(
-                surface_id=current_sid,
+                surface_id=sid,
                 index0=interval_start, index1=end_i,
                 t0=start_rec.t, t1=t,
                 arc0=interval_arc0, arc1=arc_global,
@@ -453,7 +500,8 @@ def project_curve(
             )
 
         def try_transition(reason_context):
-            nonlocal current_sid, interval_start, interval_arc0, switched, prev_attached_xyz
+            nonlocal current_sid, interval_start, interval_arc0, switched
+            nonlocal prev_attached_xyz
             if mode != "transition" or switched or not transition:
                 return False
             auth = authorize_switch(transition, current_sid, rec.xyz, transition_band)
@@ -461,9 +509,23 @@ def project_curve(
                 return False
             tp: TransitionPoint = auth["target"]
             anchor_xyz = tuple(rec.xyz) if rec.xyz is not None else tuple(query)
-            b_res = closest(smap[tp.surface_id], anchor_xyz, warm_uv=(tp.u, tp.v))
+            new_track = tracks[tp.surface_id]
+            new_surf = smap[tp.surface_id]
+            # Honour the user-drawn landing UV: solve from that parameter value
+            # so the switch lands on the branch the transition line specifies,
+            # then keep the matching tracked frame for reporting.
+            from .solver import closest as _closest
+            b_res = _closest(new_surf, anchor_xyz, warm_uv=(tp.u, tp.v))
             if b_res.best.distance > switch_max_distance:
                 return False
+            nb = b_res.best
+            b_frame = min(
+                new_track.frames,
+                key=lambda f: min(
+                    abs(f.candidate.u - nb.u),
+                    abs(f.candidate.v - nb.v),
+                ),
+            )
             old_sid = current_sid
             sw = {
                 "index": i,
@@ -473,8 +535,9 @@ def project_curve(
                 "context": reason_context,
                 "previousOobReason": reason_context if reason_context not in (None, "LINE_CROSSING") else None,
                 "matchDistance": auth["match_distance"],
-                "targetUv": [b_res.best.u, b_res.best.v],
-                "targetDistance": b_res.best.distance,
+                "targetUv": [nb.u, nb.v],
+                "targetDistance": nb.distance,
+                "targetBranchStatus": b_frame.status,
             }
             safe_switch_info = {
                 "fromIndex": auth["from_index"],
@@ -482,9 +545,10 @@ def project_curve(
                 "matchDistance": auth["match_distance"],
                 "target": auth["target"].to_dict(),
             }
-            intervals.append(build_interval(i, u_c, v_c, reason_context or "TRANSITION_LINE", safe_switch_info))
+            intervals.append(build_interval(
+                i, u_c, v_c, reason_context or "TRANSITION_LINE", safe_switch_info
+            ))
             switches.append(sw)
-            nb = b_res.best
             current_sid = tp.surface_id
             rec.surface_id = current_sid
             rec.u, rec.v = nb.u, nb.v
@@ -493,9 +557,10 @@ def project_curve(
             rec.ortho_rel = nb.ortho_rel
             rec.location = nb.location
             rec.oob_reasons = list(nb.oob_reasons)
+            rec.u_unwrapped = b_frame.u_unwrapped
+            rec.v_unwrapped = b_frame.v_unwrapped
+            rec.branch = _branch_record(b_frame, new_track)
             rec.switch = sw
-            last_uv[current_sid] = (nb.u, nb.v)
-            last_unwrapped.pop(current_sid, None)
             interval_arc0 = arc_global
             interval_start = i
             switched = True
@@ -507,7 +572,7 @@ def project_curve(
             records.append(rec)
             continue
 
-        # 2) Verified domain exit: authorized line next to it, or close up.
+        # 2) Verified domain exit or a physical/parameter break from tracking.
         if chosen_cand.oob_reasons:
             reason = chosen_cand.oob_reason
             if try_transition(reason):
@@ -520,6 +585,33 @@ def project_curve(
             w = (f"index {i}: {current_sid} domain exit {reason}; "
                  + ("no matching transition line -> clipped" if mode == "transition"
                     else "continuous-only edit, no switch allowed -> clipped"))
+            rec.warnings.append(w)
+            warnings_all.append(w)
+        elif frame.status == "break":
+            # The tracked route could not stay continuous. Close the interval
+            # at the previous sample (the break sample itself is not attached)
+            # and report the break instead of an in-air connector.
+            reason = frame.reason
+            rec.status = "oob"
+            rec.oob_reasons = ["ROUTE_" + reason]
+            rec.terminal = True
+            end_i = max(interval_start, i - 1)
+            prev_rec = records[end_i]
+            intervals.append(Interval(
+                surface_id=current_sid,
+                index0=interval_start, index1=end_i,
+                t0=records[interval_start].t, t1=prev_rec.t,
+                arc0=interval_arc0, arc1=arc_global,
+                uv_start=(records[interval_start].u, records[interval_start].v),
+                uv_end=(prev_rec.u, prev_rec.v),
+                xyz_start=None if records[interval_start].xyz is None else tuple(records[interval_start].xyz),
+                xyz_end=None if prev_rec.xyz is None else tuple(prev_rec.xyz),
+                end_reason="ROUTE_" + reason,
+            ))
+            interval_open = False
+            oob_records.append(rec)
+            w = (f"index {i}: {current_sid} route not continuable ({reason}); "
+                 "interval closed, no connector added")
             rec.warnings.append(w)
             warnings_all.append(w)
 
@@ -539,8 +631,27 @@ def project_curve(
             end_reason=None,
         ))
 
+    summary = {
+        "strategy": branch_strategy,
+        "surfaces": {
+            sid: {
+                "chosenStrategy": t.strategy,
+                "strategyComparison": t.comparison,
+                "stats": t.stats,
+                "breaks": t.breaks,
+                "attachmentError": t.real_attachment_error,
+            }
+            for sid, t in tracks.items()
+        },
+        "totalBreaks": sum(len(t.breaks) for t in tracks.values()),
+        "ambiguousSamples": {sid: t.stats["ambiguousSamples"] for sid, t in tracks.items()},
+        "branchSwitches": {sid: t.stats["branchSwitches"] for sid, t in tracks.items()},
+        "recoveries": {sid: t.stats["recoveries"] for sid, t in tracks.items()},
+    }
+
     return ProjectionOutcome(
         mode=mode, points=records, intervals=intervals,
         oob_records=oob_records, switches=switches, warnings=warnings_all,
         tie_holds=tie_holds, surface_order=order,
+        tracks=tracks, strategy=branch_strategy, branch_summary=summary,
     )

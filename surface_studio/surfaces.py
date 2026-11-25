@@ -184,6 +184,13 @@ class TransformedSurface(ParamSurface):
         # Rotation-only rigid transforms keep derivative vectors rotated.
         return self._t(p), _rotate_only(self._t, p, pu), _rotate_only(self._t, p, pv)
 
+    def normal(self, u, v, eps: float = _DEG_EPS):
+        # Delegate orientation to the base surface: subclasses may override the
+        # normal's sign (e.g. a swept spout points outward), and computing from
+        # cross(du, dv) here would silently flip it after a rigid transform.
+        n = self.base.normal(u, v, eps)
+        return None if n is None else _rotate_only(self._t, self.base.point(u, v), n)
+
 
 def _rotate_only(t: Callable, origin_p, vec):
     """Apply the rotational part of a rigid transform to a derivative vector."""

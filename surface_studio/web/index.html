@@ -20,11 +20,21 @@
         模型旋转 <strong id="yawValue">35.0°</strong>
         <input id="yawSlider" type="range" min="-180" max="180" step="1" value="35" />
       </label>
+      <label class="branch-control">
+        分支策略
+        <select id="branchStrategy">
+          <option value="auto">自动（实测择优）</option>
+          <option value="neighbor">邻域延续</option>
+          <option value="path">路径约束</option>
+        </select>
+      </label>
       <button id="runA" class="btn">运行 A：仅壶嘴连续</button>
       <button id="runB" class="btn primary">运行 B：转接线换片</button>
       <button id="pickToggle" class="btn warn">拾取转接线</button>
       <button id="presetLine" class="btn ghost">预设线</button>
       <button id="clearPicks" class="btn ghost">清除拾取</button>
+      <button id="anchorToggle" class="btn warn">添加分支锚点</button>
+      <button id="clearAnchors" class="btn ghost">清除锚点</button>
       <button id="diagnoseBtn" class="btn ghost">求解诊断</button>
       <button id="exportBtn" class="btn success">旋转后导出两份图样</button>
     </div>
@@ -38,8 +48,9 @@
       </div>
       <div class="canvas-wrap">
         <canvas id="view3d"></canvas>
-        <div class="viewport-hint">左键拖动旋转视角 · 滚轮缩放 · “拾取转接线”开启后单击曲面；单击与拖动已区分</div>
+        <div class="viewport-hint">左键拖动旋转视角 · 滚轮缩放 · “拾取转接线/添加分支锚点”开启后单击曲面 · 悬停轨迹查看被放弃候选</div>
         <div id="pickInfo" class="pick-info hidden"></div>
+        <div id="branchOverlay" class="branch-overlay hidden"></div>
       </div>
       <div id="exportLinks" class="export-links"></div>
     </section>
@@ -61,6 +72,12 @@
           <input id="angleSlider" type="range" min="-45" max="45" step="1" value="0" />
         </label>
         <div id="transitionList" class="transition-list"></div>
+        <div id="anchorList" class="transition-list"></div>
+      </section>
+
+      <section id="branchReport" class="report-block">
+        <h2>分支跟踪</h2>
+        <p class="tiny">运行投影后显示：候选数、被放弃的候选、选择依据与断点。</p>
       </section>
 
       <section id="report" class="report-block">
