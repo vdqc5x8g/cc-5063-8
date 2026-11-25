@@ -1,0 +1,270 @@
+{
+  "schema": "surface-studio-report-v1",
+  "yawRad": 0.61,
+  "yawDeg": 34.95042550298022,
+  "correctnessPass": true,
+  "checks": {
+    "bTeaOnSpout": true,
+    "bPotOnBody": true,
+    "bSeamReadable": true,
+    "aHasVerifiedClipping": true,
+    "rotationUvInvariant": true,
+    "equalDistanceNeverSwitches": true
+  },
+  "rotationCheck": {
+    "yawRadChecked": 0.61,
+    "maxUvDifference": 2.8920161376788656e-08,
+    "maxDistanceDifference": 4.6435723322080236e-11,
+    "sameFaceLetters": true,
+    "seamReadable": true,
+    "uvInvariant": true
+  },
+  "A": {
+    "faceLetters": {
+      "spout": [
+        "T",
+        "E",
+        "A",
+        "P"
+      ]
+    },
+    "clippedLetters": [
+      {
+        "char": "O",
+        "surfaceId": "spout",
+        "reason": "DECAL_CLIPPED_AFTER_INTERVAL_END:BEYOND_U_MIN"
+      },
+      {
+        "char": "T",
+        "surfaceId": "spout",
+        "reason": "DECAL_CLIPPED_AFTER_INTERVAL_END:BEYOND_U_MIN"
+      }
+    ],
+    "clipCounts": {
+      "DECAL_CLIPPED_AFTER_INTERVAL_END": 150
+    },
+    "intervals": [
+      {
+        "surfaceId": "spout",
+        "index0": 0,
+        "index1": 23,
+        "t0": 0.0,
+        "t1": 0.5897435897435898,
+        "arc0": 0.0,
+        "arc1": 2.0019339369726676,
+        "uvStart": [
+          0.9849999999961097,
+          2.9499999824659984
+        ],
+        "uvEnd": [
+          0.0,
+          2.9712106916319527
+        ],
+        "xyzStart": [
+          1.7335907574036218,
+          1.0325384260967496,
+          -1.1819542742602152
+        ],
+        "xyzEnd": [
+          0.7451289656498993,
+          -0.4809932480068874,
+          -0.456655666997052
+        ],
+        "endReason": "BEYOND_U_MIN",
+        "startReason": "initial-pick",
+        "switchInfo": null
+      }
+    ],
+    "warnings": [
+      "[body] GLOBAL_OPTIMUM_NOT_GUARANTEED_RESTRICTED_SEARCH:finite seeds may miss a basin on a non-convex surface",
+      "[spout] GLOBAL_OPTIMUM_NOT_GUARANTEED_RESTRICTED_SEARCH:finite seeds may miss a basin on a non-convex surface",
+      "index 20: body closer but switch not authorized; keeping spout",
+      "index 21: body closer but switch not authorized; keeping spout",
+      "index 22: body closer but switch not authorized; keeping spout",
+      "index 23: body closer but switch not authorized; keeping spout",
+      "index 23: spout domain exit BEYOND_U_MIN; continuous-only edit, no switch allowed -> clipped",
+      "index 24: body closer but switch not authorized; keeping spout",
+      "index 25: body closer but switch not authorized; keeping spout",
+      "index 26: body closer but switch not authorized; keeping spout",
+      "index 27: body closer but switch not authorized; keeping spout",
+      "index 28: body closer but switch not authorized; keeping spout",
+      "index 29: body closer but switch not authorized; keeping spout",
+      "index 30: body closer but switch not authorized; keeping spout",
+      "index 31: body closer but switch not authorized; keeping spout",
+      "index 32: body closer but switch not authorized; keeping spout",
+      "index 33: body closer but switch not authorized; keeping spout",
+      "index 34: body closer but switch not authorized; keeping spout",
+      "index 35: body closer but switch not authorized; keeping spout",
+      "index 36: body closer but switch not authorized; keeping spout",
+      "index 37: body closer but switch not authorized; keeping spout",
+      "index 38: body closer but switch not authorized; keeping spout",
+      "index 39: body closer but switch not authorized; keeping spout"
+    ]
+  },
+  "B": {
+    "faceLetters": {
+      "spout": [
+        "T",
+        "E",
+        "A"
+      ],
+      "body": [
+        "P",
+        "O",
+        "T"
+      ]
+    },
+    "clippedLetters": [],
+    "clipCounts": {},
+    "seam": {
+      "hasSeam": true,
+      "fromSurface": "spout",
+      "toSurface": "body",
+      "seamArc": 1.7019226391541076,
+      "physicalGap": 0.049894428396296056,
+      "tangentAngleDeg": 25.39388578655546,
+      "sideAngleDeg": 6.217383750668255,
+      "registrationGap": 0.12238040990665602,
+      "readable": true,
+      "thresholds": {
+        "gap": 0.14,
+        "tangentAngleDeg": 35,
+        "sideAngleDeg": 35
+      },
+      "switch": {
+        "index": 21,
+        "fromSurface": "spout",
+        "toSurface": "body",
+        "reason": "USER_TRANSITION_LINE",
+        "context": "LINE_CROSSING",
+        "previousOobReason": null,
+        "matchDistance": 1.630989251805361e-10,
+        "targetUv": [
+          0.3093512897836852,
+          0.0481688920062569
+        ],
+        "targetDistance": 0.049894428396296056
+      }
+    },
+    "distortion": {
+      "available": true,
+      "areaRatioMin": 0.9980087604172354,
+      "areaRatioMax": 1.01172236947901,
+      "areaRatioMean": 1.0049435285607553,
+      "anisotropyMax": 1.0072344423316337
+    },
+    "intervals": [
+      {
+        "surfaceId": "spout",
+        "index0": 0,
+        "index1": 21,
+        "t0": 0.0,
+        "t1": 0.5384615384615384,
+        "arc0": 0.0,
+        "arc1": 1.7019226391541076,
+        "uvStart": [
+          0.9849999999961097,
+          2.9499999824659984
+        ],
+        "uvEnd": [
+          0.1200000000006733,
+          2.9499999994333166
+        ],
+        "xyzStart": [
+          1.7335907574036218,
+          1.0325384260967496,
+          -1.1819542742602152
+        ],
+        "xyzEnd": [
+          0.9632195662889879,
+          -0.34389021654733487,
+          -0.6063499179743834
+        ],
+        "endReason": "LINE_CROSSING",
+        "startReason": "initial-pick",
+        "switchInfo": {
+          "fromIndex": 1,
+          "toIndex": 3,
+          "matchDistance": 1.630989251805361e-10,
+          "target": {
+            "surfaceId": "body",
+            "u": 0.3094,
+            "v": 0.0482,
+            "xyz": [
+              0.9225900174538441,
+              -0.33038028603766006,
+              -0.5807334099941692
+            ]
+          }
+        }
+      },
+      {
+        "surfaceId": "body",
+        "index0": 21,
+        "index1": 39,
+        "t0": 0.5384615384615384,
+        "t1": 1.0,
+        "arc0": 1.7019226391541076,
+        "arc1": 3.0238438257593723,
+        "uvStart": [
+          0.3093512897836852,
+          0.0481688920062569
+        ],
+        "uvEnd": [
+          0.0009999997755267564,
+          1.1627833781442303
+        ],
+        "xyzStart": [
+          0.9225342787256267,
+          -0.3305406388596071,
+          -0.5807383944656376
+        ],
+        "xyzEnd": [
+          0.3937669513545111,
+          -0.8599130381919031,
+          0.24293113980019654
+        ],
+        "endReason": null,
+        "startReason": "initial-pick",
+        "switchInfo": null
+      }
+    ],
+    "switches": [
+      {
+        "index": 21,
+        "fromSurface": "spout",
+        "toSurface": "body",
+        "reason": "USER_TRANSITION_LINE",
+        "context": "LINE_CROSSING",
+        "previousOobReason": null,
+        "matchDistance": 1.630989251805361e-10,
+        "targetUv": [
+          0.3093512897836852,
+          0.0481688920062569
+        ],
+        "targetDistance": 0.049894428396296056
+      }
+    ],
+    "warnings": [
+      "[body] GLOBAL_OPTIMUM_NOT_GUARANTEED_RESTRICTED_SEARCH:finite seeds may miss a basin on a non-convex surface",
+      "[spout] GLOBAL_OPTIMUM_NOT_GUARANTEED_RESTRICTED_SEARCH:finite seeds may miss a basin on a non-convex surface",
+      "index 20: body closer but switch not authorized; keeping spout",
+      "index 21: body closer but switch not authorized; keeping spout"
+    ]
+  },
+  "files": {
+    "A": {
+      "svg": "/workspace/exports/pattern_A_spout_only.svg",
+      "json": "/workspace/exports/pattern_A_spout_only.json",
+      "csv": "/workspace/exports/pattern_A_spout_only.csv",
+      "routeCsv": "/workspace/exports/pattern_A_spout_only.route.csv"
+    },
+    "B": {
+      "svg": "/workspace/exports/pattern_B_transition.svg",
+      "json": "/workspace/exports/pattern_B_transition.json",
+      "csv": "/workspace/exports/pattern_B_transition.csv",
+      "routeCsv": "/workspace/exports/pattern_B_transition.route.csv"
+    }
+  },
+  "routeCsv": "/workspace/exports/projection_routes.csv"
+}

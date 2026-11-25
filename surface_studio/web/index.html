@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>曲面贴附设计工具 · Surface Studio</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">∿</span>
+      <div>
+        <h1>曲面贴附设计工具</h1>
+        <p>解析最近点反求 · 连续区间/越界原因 · 转接线授权换片 · 真实畸变</p>
+      </div>
+    </div>
+    <div class="toolbar">
+      <label class="yaw-control">
+        模型旋转 <strong id="yawValue">35.0°</strong>
+        <input id="yawSlider" type="range" min="-180" max="180" step="1" value="35" />
+      </label>
+      <button id="runA" class="btn">运行 A：仅壶嘴连续</button>
+      <button id="runB" class="btn primary">运行 B：转接线换片</button>
+      <button id="pickToggle" class="btn warn">拾取转接线</button>
+      <button id="presetLine" class="btn ghost">预设线</button>
+      <button id="clearPicks" class="btn ghost">清除拾取</button>
+      <button id="diagnoseBtn" class="btn ghost">求解诊断</button>
+      <button id="exportBtn" class="btn success">旋转后导出两份图样</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel viewport-panel">
+      <div class="panel-title">
+        <h2>真实曲面 / 原设计曲线 / 投影轨迹 / 贴附笔画</h2>
+        <span id="viewStatus" class="status-pill">正在连接求解器…</span>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="view3d"></canvas>
+        <div class="viewport-hint">左键拖动旋转视角 · 滚轮缩放 · “拾取转接线”开启后单击曲面；单击与拖动已区分</div>
+        <div id="pickInfo" class="pick-info hidden"></div>
+      </div>
+      <div id="exportLinks" class="export-links"></div>
+    </section>
+
+    <aside class="panel side-panel">
+      <section class="control-block">
+        <h2>贴附编辑</h2>
+        <p class="tiny">下方图样区可直接拖动；也可使用滑杆精确调整。</p>
+        <label>弧向偏移 offset <strong id="offsetValue">1.70</strong>
+          <input id="offsetSlider" type="range" min="0" max="4.2" step="0.01" value="1.70" />
+        </label>
+        <label>侧向位置 lateral <strong id="lateralValue">0.00</strong>
+          <input id="lateralSlider" type="range" min="-0.65" max="0.65" step="0.01" value="0" />
+        </label>
+        <label>图案缩放 scale <strong id="scaleValue">0.24</strong>
+          <input id="scaleSlider" type="range" min="0.12" max="0.48" step="0.01" value="0.24" />
+        </label>
+        <label>旋转角 angle <strong id="angleValue">0°</strong>
+          <input id="angleSlider" type="range" min="-45" max="45" step="1" value="0" />
+        </label>
+        <div id="transitionList" class="transition-list"></div>
+      </section>
+
+      <section id="report" class="report-block">
+        <h2>求解与裁切报告</h2>
+        <p class="tiny">等待运行真实投影…</p>
+      </section>
+    </aside>
+
+    <section class="panel pattern-panel">
+      <div class="panel-title">
+        <h2>图案编辑条 / 两份结果共用的 TEAPOT 矢量笔画</h2>
+        <span class="tiny">蓝=spout，橙=body，红点=裁切；拖动此画布改变 offset/lateral</span>
+      </div>
+      <canvas id="patternCanvas"></canvas>
+    </section>
+
+    <section class="panel distortion-panel">
+      <div class="panel-title">
+        <h2>局部面积畸变热力图（来自解析度量 √(EG−F²)）</h2>
+        <select id="distSurface"></select>
+      </div>
+      <div class="dist-body">
+        <canvas id="distCanvas"></canvas>
+        <div id="distStats" class="dist-stats"></div>
+      </div>
+    </section>
+
+    <section id="diagnosticsPanel" class="panel diagnostics-panel hidden">
+      <div class="panel-title"><h2>求解器形态测试</h2></div>
+      <div id="diagnosticsContent"></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
